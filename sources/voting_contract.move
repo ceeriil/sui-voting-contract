@@ -96,5 +96,35 @@ public struct Candidate has store {
     );
   }
 
+ public fun vote(candidate_ids: vector<u64>, votes: &mut Votes, address_seed: u256, ctx: &TxContext) {
+
+    let voter = ctx.sender();
+
+    assert_user_has_not_voted(voter, votes);
+    assert_sender_zklogin(address_seed, ctx);
+    assert_valid_project_ids(candidate_ids, votes);
+    assert_voting_is_active(votes);
+
+    // Update candidate's vote
+    let mut curr_index = 0;
+    while (curr_index < candidate_ids.length()) {
+      let candidate = &mut votes.candidates_list[candidate_ids[curr_index]];
+      candidate.votes = candidate.votes + 1;
+
+      // Increment total votes
+      votes.total_votes = votes.total_votes + 1;
+
+      curr_index = curr_index + 1;
+    };
+
+    // Record user's vote
+    table::add(
+      &mut votes.votes, 
+      voter, 
+      candidate_ids
+    );
+  }
+
+ 
  
 }
