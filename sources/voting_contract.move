@@ -9,7 +9,7 @@ module voting_contract::voting_contract;
 
 
 /// Module: voting
-module voting::voting {
+module voting_contract::voting {
   use std::string;
   use sui::table;
   use sui::vec_map;
@@ -19,7 +19,7 @@ module voting::voting {
   const EInvalidProof: u64 = 1;
   const EUserAlreadyVoted: u64 = 2;
   const ETooManyVotes: u64 = 3;
-  const EInvalidProjectId: u64 = 4;
+  const EInvalidCandidateId: u64 = 4;
   const EVotingInactive: u64 = 5;
 
   public struct Votes has key {
@@ -102,7 +102,7 @@ public struct Candidate has store {
 
     assert_user_has_not_voted(voter, votes);
     assert_sender_zklogin(address_seed, ctx);
-    assert_valid_project_ids(candidate_ids, votes);
+    assert_valid_candidate_ids(candidate_ids, votes);
     assert_voting_is_active(votes);
 
     // Update candidate's vote
@@ -125,6 +125,50 @@ public struct Candidate has store {
     );
   }
 
+ public entry fun toggle_voting(_: &AdminCap, can_vote: bool, votes: &mut Votes) {
+    votes.voting_active = can_vote;
+  }
+
+  fun assert_user_has_not_voted(user: address, votes: &Votes) {
+    assert!(
+      table::contains(
+        &votes.votes, 
+        user
+      ) == false, 
+      EUserAlreadyVoted
+    );
+  }
+
+  fun assert_valid_candidate_ids(candidate_ids: vector<u64>, votes: &Votes) {
+    assert!(
+      candidate_ids.length() <= 3, 
+      ETooManyVotes
+    );
+    
+    let mut curr_index = 0;
+    let mut ids = vec_map::empty();
+    while (curr_index < candidate_ids.length()) {
+      assert!(
+        candidate_ids[curr_index] < votes.candidates_list.length(),
+        EInvalidCandidateId
+      );
+      vec_map::insert(&mut ids, candidate_ids[curr_index], 0); // this will abort if there is a dup
+      curr_index = curr_index + 1;
+    };
+  }
+
+  fun assert_voting_is_active(votes: &Votes) {
+    assert!(
+      votes.voting_active, 
+      EVotingInactive
+    );
+  }
+
+  fun assert_sender_zklogin(address_seed: u256, ctx: &TxContext) {
+    let sender = ctx.sender();
+    let issuer = string::utf8(b"https://accounts.google.com");
+    assert!(check_zklogin_issuer(sender, address_seed, &issuer), EInvalidProof);
+  }
  
  
 }
